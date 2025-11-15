@@ -16,6 +16,7 @@ data:
   # Application settings
   application.instanceLabelKey: argocd.argoproj.io/instance
 
+  accounts.admin: apiKey
   # Add Git repositories here if using private repos
   # repositories: |
   #   - url: https://github.com/your-org/your-repo

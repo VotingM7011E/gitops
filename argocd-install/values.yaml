@@ -41,4 +41,4 @@ resources:
 ingress:
   enabled: true
   # Use staging for testing, switch to letsencrypt-prod for production
-  certIssuer: letsencrypt-staging
+  certIssuer: letsencrypt-prod
