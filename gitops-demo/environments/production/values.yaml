@@ -9,7 +9,7 @@ app:
 domain: helloworld-prod.ltu-m7011e-2.se
 
 # Email for Let's Encrypt certificates
-email: anonys-2@studentltu.se
+email: anonys-2@student.ltu.se
 
 # Environment identifier
 environment: Production
