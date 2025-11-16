@@ -11,7 +11,7 @@ spec:
     path: hello-world-service-app
     helm:
       valueFiles:
-        - ../../environments/dev/hello-world-service.yaml
+        - ../environments/dev/hello-world-service.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: hello-world-service-dev
