@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.app.name }}-frontend
+  labels:
+    app: {{ .Values.app.name }}-frontend
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.app.name }}-frontend
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.app.name }}-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: {{ .Values.image.frontendRepository }}:{{ .Values.image.frontendTag }}
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5

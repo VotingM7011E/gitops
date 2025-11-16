@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.app.name }}-backend
+  labels:
+    app: {{ .Values.app.name }}-backend
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.app.name }}-backend
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.app.name }}-backend
+    spec:
+      containers:
+        - name: backend
+          image: {{ .Values.image.backendRepository }}:{{ .Values.image.backendTag }}
+          ports:
+            - containerPort: 8000
+          env:
+            - name: FLASK_APP
+              value: app.py
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          livenessProbe:
+            httpGet:
+              path: /api/todos
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/todos
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
