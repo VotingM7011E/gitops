@@ -19,7 +19,7 @@ message: "Hello from Development Environment!"
 # Container image
 image:
   repository: ghcr.io/votingm7011e/hello-world-service
-  tag: 4451e7337fc49184faa481f8ffb312554b91e508
+  tag: c01173f9f9b6488a311afc5d7f57a427d70c9bf6
 
 # Ingress configuration
 ingress:
