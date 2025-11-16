@@ -1,25 +1,19 @@
-# Backend Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.app.name }}-backend
-spec:
-  selector:
+  name: {{ .Values.app.name }}
+  labels:
     app: {{ .Values.app.name }}
+spec:
+  type: ClusterIP
   ports:
     - port: 8000
       targetPort: backend
       protocol: TCP
-
-# Frontend Service
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ .Values.app.name }}-frontend
-spec:
-  selector:
-    app: {{ .Values.app.name }}
-  ports:
+      name: backend
     - port: 8080
       targetPort: frontend
       protocol: TCP
+      name: frontend
+  selector:
+    app: {{ .Values.app.name }}

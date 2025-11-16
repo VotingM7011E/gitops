@@ -14,14 +14,14 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ .Values.app.name }}-backend
+                name: {{ .Values.app.name }}
                 port:
                   number: 8000
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: {{ .Values.app.name }}-frontend
+                name: {{ .Values.app.name }}
                 port:
                   number: 8080
   tls:
