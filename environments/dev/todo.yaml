@@ -12,14 +12,12 @@ environment: Development
 # Container imag
 image:
   backendRepository: ghcr.io/votingm7011e/todo-backend
-  backendTag: PLACEHOLDER
+  backendTag: 6d4833660f55b95240f1b399eb44bf596a1a9d54
   frontendRepository: ghcr.io/votingm7011e/todo-frontend
-  frontendTag: PLACEHOLDER
-
+  frontendTag: 6d4833660f55b95240f1b399eb44bf596a1a9d54
 ports:
   backend: 8000
   frontend: 8080
-
 # Ingress configuration
 ingress:
   # Use staging for testing to avoid rate limits
