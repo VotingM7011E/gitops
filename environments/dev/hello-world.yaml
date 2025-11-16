@@ -14,7 +14,7 @@ message: "Hello from Development Environment!"
 # Container image
 image:
   repository: ghcr.io/votingm7011e/hello-world
-  tag: PLACEHOLDER
+  tag: 4f21535e65290801e52eac037c2b86b838c91296
 # Ingress configuration
 ingress:
   # Use staging for testing to avoid rate limits
