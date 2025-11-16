@@ -4,25 +4,24 @@ metadata:
   name: {{ .Values.app.name }}
   annotations:
     cert-manager.io/cluster-issuer: {{ .Values.ingress.certIssuer }}
-    traefik.ingress.kubernetes.io/rewrite-target: /api
 spec:
   ingressClassName: traefik
   rules:
     - host: {{ .Values.domain }}
       http:
         paths:
-          - path: /backend
+          - path: /api
             pathType: Prefix
             backend:
               service:
-                name: {{ .Values.app.name }}
+                name: {{ .Values.app.name }}-backend
                 port:
                   number: 8000
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: {{ .Values.app.name }}
+                name: {{ .Values.app.name }}-frontend
                 port:
                   number: 8080
   tls:
