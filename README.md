@@ -5,87 +5,35 @@ This directory contains a sample application structured for GitOps deployment wi
 ## Directory Structure
 
 ```
-gitops-demo/
-├── environments/
+gitops/
+├── manifests/                # Argo CD Application manifests
+│   ├── app1-dev.yaml
+│   ├── app1-staging.yaml
+│   └── app1-prod.yaml
+├── environments/             # Helm values per environment, per app
 │   ├── dev/
-│   │   └── values.yaml          # Development environment configuration
+│   │   └── app1.yaml
 │   ├── staging/
-│   │   └── values.yaml          # Staging environment configuration
+│   │   └── app1.yaml
 │   └── production/
-│       └── values.yaml          # Production environment configuration
-└── hello-world-app/
-    ├── Chart.yaml               # Helm chart metadata
-    └── templates/
-        ├── deployment.yaml      # Kubernetes deployment
-        ├── service.yaml         # Service definition
-        ├── ingress.yaml         # Ingress for external access
-        └── configmap.yaml       # Application HTML content
+│       └── app1.yaml
+└── app1-app/                 # Helm chart metadata
+    ├── Chart.yaml
+    └── templates/            # Templates; per app basis
+        ├── deployment.yaml
+        ├── service.yaml
+        ├── ingress.yaml
+        └── configmap.yaml
 ```
 
-## How to Use
-
-### 1. Fork/Copy to Your Git Repository
-
-This demo needs to be in a Git repository for Argo CD to access it.
-
-```bash
-# Create a new Git repository
-git init
-git add .
-git commit -m "Initial GitOps demo"
-
-# Push to your remote repository (GitHub, GitLab, etc.)
-git remote add origin https://github.com/YOUR_USERNAME/m7011e-gitops.git
-git push -u origin main
-```
-
-### 2. Customize for Your Environment
-
-Edit the values files for each environment and change:
-
-**environments/dev/values.yaml:**
-```yaml
-domain: helloworld-dev.ltu-m7011e-yourname.se
-email: your.email@ltu.se
-```
-
-**environments/staging/values.yaml:**
-```yaml
-domain: helloworld-staging.ltu-m7011e-yourname.se
-email: your.email@ltu.se
-```
-
-**environments/production/values.yaml:**
-```yaml
-domain: helloworld-prod.ltu-m7011e-yourname.se
-email: your.email@ltu.se
-```
-
-### 3. Deploy with Argo CD
-
-See the main tutorial README for complete Argo CD deployment instructions.
-
-**Quick commands:**
-
-```bash
-# Create dev environment application
-argocd app create hello-world-dev \
-  --repo https://github.com/YOUR_USERNAME/m7011e-gitops.git \
-  --path hello-world-app \
-  --dest-namespace hello-world-dev \
-  --values ../environments/dev/values.yaml
-
-# Sync the application
-argocd app sync hello-world-dev
-```
 
 ## Environment Differences
 
 | Environment | Replicas | Domain | Cert Issuer | Purpose |
 |-------------|----------|--------|-------------|---------|
-| Development | 1 | helloworld-dev.* | staging | Testing new features |
-| Staging | 2 | helloworld-staging.* | staging | Pre-production validation |
-| Production | 3 | helloworld-prod.* | production | Live user traffic |
+| Development | 1 | app1-dev.* | staging | Testing new features |
+| Staging | 2 | app1-staging.* | staging | Pre-production validation |
+| Production | 3 | app1-prod.* | production | Live user traffic |
 
 ## Making Changes
 
@@ -99,7 +47,7 @@ argocd app sync hello-world-dev
 
 ```bash
 # Edit values file
-nano environments/dev/values.yaml
+nano environments/dev/app1.yaml
 # Change replicas: 3
 
 # Commit and push
@@ -107,7 +55,7 @@ git commit -am "Scale dev environment to 3 replicas"
 git push origin main
 
 # Watch Argo CD sync
-argocd app get hello-world-dev
+argocd app get app1-dev
 ```
 
 ### Promote Between Environments
@@ -140,10 +88,10 @@ Before pushing to Git, test your Helm chart locally:
 
 ```bash
 # Test dev environment
-helm template hello-world-app -f environments/dev/values.yaml .
+helm template app1-app -f environments/dev/app1.yaml .
 
 # Install locally to test namespace
-helm install test-dev hello-world-app -f environments/dev/values.yaml -n test-dev --create-namespace
+helm install test-dev app1-app -f environments/dev/app1.yaml -n test-dev --create-namespace
 
 # Cleanup
 helm uninstall test-dev -n test-dev
@@ -155,26 +103,18 @@ kubectl delete namespace test-dev
 ### Verify Helm Chart Syntax
 
 ```bash
-helm lint hello-world-app
+helm lint app1-app
 ```
 
 ### Check Generated Manifests
 
 ```bash
-helm template hello-world-app -f environments/dev/values.yaml .
+helm template app1-app -f environments/dev/app1.yaml .
 ```
 
 ### Validate Values
 
 ```bash
 # Check what values will be used
-helm show values hello-world-app
+helm show values app1-app
 ```
-
-## Next Steps
-
-1. Customize the application templates for your needs
-2. Add more environments if needed
-3. Integrate with CI/CD to update image tags
-4. Add more complex applications (databases, microservices)
-5. Implement app-of-apps pattern for multiple applications
