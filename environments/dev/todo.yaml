@@ -3,7 +3,7 @@
 app:
   name: todo
 backend:
-  replicas: 2
+  replicas: 1
 frontend:
   replicas: 1
 # Development domain - change to your assigned domain
