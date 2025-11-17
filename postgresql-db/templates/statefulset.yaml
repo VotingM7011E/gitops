@@ -2,8 +2,10 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgresql
+  labels:
+    app: postgresql
 spec:
-  serviceName: postgresql
+  serviceName: "postgresql-internal"
   replicas: 1
   selector:
     matchLabels:
@@ -15,7 +17,8 @@ spec:
     spec:
       containers:
         - name: postgresql
-          image: {{ .Values.postgresql.image }} 
+          image: {{ .Values.postgresql.image }}
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: {{ .Values.postgresql.port }}
           env:
@@ -35,15 +38,21 @@ spec:
                   name: postgresql-config
                   key: POSTGRES_DB
           volumeMounts:
-            - name: postgredb
+            - name: postgresdb
               mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: {{ .Values.postgresql.resources.requests.memory | quote }}
+              cpu: {{ .Values.postgresql.resources.requests.cpu | quote }}
+            limits:
+              memory: {{ .Values.postgresql.resources.limits.memory | quote }}
+              cpu: {{ .Values.postgresql.resources.limits.cpu | quote }}
   volumeClaimTemplates:
     - metadata:
-        name: postgredb
+        name: postgresql-pvc
       spec:
         accessModes: ["ReadWriteOnce"]
+        storageClassName: {{ .Values.postgresql.persistence.storageClass }}
         resources:
           requests:
             storage: {{ .Values.postgresql.persistence.size }}
-        storageClassName: {{ .Values.postgresql.persistence.storageClass }}
-
