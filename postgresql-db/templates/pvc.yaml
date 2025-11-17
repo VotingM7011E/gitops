@@ -6,8 +6,8 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: {{ .Values.StorageClassName }}
+  storageClassName: {{ .Values.postgresql.persistence.storageClass }}
   resources:
     requests:
-      storage: {{ .Values.DBStorage }}
+      storage: {{ .Values.postgresql.persistence.size }}
 
