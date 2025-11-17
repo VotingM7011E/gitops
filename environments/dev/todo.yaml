@@ -25,3 +25,11 @@ ports:
 ingress:
   # Use staging for testing to avoid rate limits
   certIssuer: letsencrypt-staging
+
+
+postgresql:
+  host: postgresql
+  database: tododb
+  username: postgres
+  password: postgres
+

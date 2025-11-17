@@ -24,6 +24,14 @@ spec:
               value: app.py
             - name: PYTHONUNBUFFERED
               value: "1"
+            - name: POSTGRES_HOST
+              value: {{ .Values.postgresql.host }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgresql.database }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgresql.username }}
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.postgresql.password }}
           livenessProbe:
             httpGet:
               path: /api/todos
