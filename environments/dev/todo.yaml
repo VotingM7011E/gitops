@@ -15,9 +15,9 @@ environment: Development
 # Container imag
 image:
   backendRepository: ghcr.io/votingm7011e/todo-backend
-  backendTag: daad23a1cea8219cdbb94f757f14f748c93e3652
+  backendTag: 98ed1a0b955be1b8dac74bc9335a6ae7f5245e14
   frontendRepository: ghcr.io/votingm7011e/todo-frontend
-  frontendTag: daad23a1cea8219cdbb94f757f14f748c93e3652
+  frontendTag: 98ed1a0b955be1b8dac74bc9335a6ae7f5245e14
 ports:
   backend: 8000
   frontend: 8080
