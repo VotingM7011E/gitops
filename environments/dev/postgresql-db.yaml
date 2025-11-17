@@ -1,0 +1,18 @@
+postgresql:
+  username: postgres
+  password: postgres
+  database: tododb
+  image: postgres:16
+  port: 5432
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: standard
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "250m"
+

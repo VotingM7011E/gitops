@@ -1,0 +1,7 @@
+apiVersion: v2
+name: postgresql-db
+description: A Helm chart for PostgreSQL database
+type: application
+version: 0.1.0
+appVersion: "15"
+
