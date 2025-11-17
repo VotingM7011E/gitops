@@ -7,7 +7,7 @@ postgresql:
   persistence:
     enabled: true
     size: 1Gi
-    storageClass: standard
+    storageClass: local-path
   resources:
     requests:
       memory: "256Mi"
