@@ -15,9 +15,9 @@ environment: Development
 # Container imag
 image:
   backendRepository: ghcr.io/votingm7011e/todo-backend
-  backendTag: 586b46407662d24f4df8181de4dffcfed0596922
+  backendTag: a40cbb5bd5ab670e3d4b25f7491ba9f36ed08062
   frontendRepository: ghcr.io/votingm7011e/todo-frontend
-  frontendTag: 586b46407662d24f4df8181de4dffcfed0596922
+  frontendTag: a40cbb5bd5ab670e3d4b25f7491ba9f36ed08062
 ports:
   backend: 8000
   frontend: 8080
@@ -25,11 +25,8 @@ ports:
 ingress:
   # Use staging for testing to avoid rate limits
   certIssuer: letsencrypt-staging
-
-
 postgresql:
   host: postgresql
   database: tododb
   username: postgres
   password: postgres
-
