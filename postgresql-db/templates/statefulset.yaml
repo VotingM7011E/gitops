@@ -38,7 +38,7 @@ spec:
                   name: postgresql-config
                   key: POSTGRES_DB
           volumeMounts:
-            - name: postgresdb
+            - name: postgresql-pvc
               mountPath: /var/lib/postgresql/data
           resources:
             requests:
