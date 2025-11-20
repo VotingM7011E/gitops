@@ -1,7 +1,7 @@
 app:
   name: keycloak-app
 namespace: keycloak
-domain: helloworld-dev.ltu-m7011e-2.se
+domain: keycloak-dev.ltu-m7011e-2.se
 email: jacsjs-7@student.ltu.se
 environment: Development
 
