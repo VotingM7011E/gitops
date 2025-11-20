@@ -17,3 +17,13 @@ image:
 ingress:
   # Use staging for testing to avoid rate limits
   certIssuer: letsencrypt-staging
+mongodb:
+  enabled: true
+  image: mongo:6
+  username: tempadmin
+  password: changeme!
+  database: meeting-service-db
+
+  # Kubernetes service name for Mongo
+  serviceName: mongodb
+  port: 27017
