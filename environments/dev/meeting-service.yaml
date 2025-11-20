@@ -12,7 +12,7 @@ environment: Development
 # Container image
 image:
   repository: ghcr.io/votingm7011e/meetingservice
-  tag: 1acd22c4a7d230b435c71d11662f6166e7df78f2
+  tag: 4c7bfcca1ca76878a0360b2390c25529de43c429
 # Ingress configuration
 ingress:
   # Use staging for testing to avoid rate limits
