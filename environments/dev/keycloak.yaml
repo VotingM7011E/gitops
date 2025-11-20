@@ -1,22 +1,24 @@
 app:
-  name: keycloak
+  name: keycloak-app
 namespace: keycloak
 domain: helloworld-dev.ltu-m7011e-2.se
 email: jacsjs-7@student.ltu.se
 environment: Development
 
 keycloak:
+  fullnameOverride: keycloak-app
   existingSecret: keycloak-admin-secret
   auth:
     adminUser: admin
     existingSecretKey: admin-password
   replicas: 1
   ingress:
-    enabled: true
-    certIssuer: letsencrypt-staging
+    enabled: false
   extraEnvVars:
     - name: KC_PROXY
       value: "edge"
+    - name: KC_HOSTNAME
+      value: "helloworld-dev.ltu-m7011e-2.se"
     - name: KC_HOSTNAME_STRICT
       value: "true"
     - name: KC_HOSTNAME_STRICT_HTTPS
@@ -28,8 +30,16 @@ keycloak:
     runAsNonRoot: true
   podSecurityContext:
     fsGroup: 1001
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
 
 postgresql:
+  fullnameOverride: keycloak-db
   auth:
     username: keycloak
     existingSecret: keycloak-db-secret
@@ -39,3 +49,10 @@ postgresql:
     persistence:
       enabled: true
       size: 8Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
