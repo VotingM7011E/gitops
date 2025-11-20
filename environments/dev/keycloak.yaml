@@ -14,11 +14,15 @@ keycloak:
   replicas: 1
   ingress:
     enabled: false
+  image:
+    registry: docker.io
+    repository: bitnami/keycloak
+    tag: 24.0.0    # Valid tag from Docker Hub
   extraEnvVars:
     - name: KC_PROXY
       value: "edge"
     - name: KC_HOSTNAME
-      value: "helloworld-dev.ltu-m7011e-2.se"
+      value: "keycloak-dev.ltu-m7011e-2.se"
     - name: KC_HOSTNAME_STRICT
       value: "true"
     - name: KC_HOSTNAME_STRICT_HTTPS
@@ -40,6 +44,10 @@ keycloak:
 
 postgresql:
   fullnameOverride: keycloak-db
+  image:
+    registry: docker.io
+    repository: bitnami/postgresql
+    tag: 15.5.0    # Valid tag from Docker Hub
   auth:
     username: keycloak
     existingSecret: keycloak-db-secret

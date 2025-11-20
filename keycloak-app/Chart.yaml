@@ -2,11 +2,11 @@ apiVersion: v2
 name: keycloak-app
 description: Wrapper chart for Keycloak with PostgreSQL and security best practices
 type: application
-version: 0.1.0
+version: 0.2.0
 dependencies:
   - name: keycloak
-    version: 22.1.0
+    version: 24.0.0    # Latest stable from Bitnami
     repository: https://charts.bitnami.com/bitnami
   - name: postgresql
-    version: 12.1.0
+    version: 15.5.0    # Latest stable from Bitnami
     repository: https://charts.bitnami.com/bitnami
