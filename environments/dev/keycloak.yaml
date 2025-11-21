@@ -1,36 +1,60 @@
-# Keycloak + PostgreSQL secure configuration
+# Production-ready values.yaml for Keycloak Helm chart
+# Best practices:
+# - Do NOT store plaintext passwords here. Use Kubernetes Secrets or SealedSecrets.
+# - Ensure SealedSecrets are applied before this chart (Argo CD sync-wave).
+# - Enable TLS for all ingress traffic.
+# - Configure resource requests and limits for stability.
+
 app:
-  name: keycloak
   replicas: 1
 
 # Domain and email for TLS certificates
 domain: keycloak-dev.ltu-m7011e-2.se
 email: jacsjs-7@student.ltu.se
 
-# Cert issuer (use staging for dev)
 ingress:
+  # Traefik ingress class
+  ingressClassName: traefik
+  # Cert issuer for cert-manager (use letsencrypt-prod for production)
   certIssuer: letsencrypt-staging
 
-# Keycloak configuration
 keycloak:
+  # Keycloak container image
   image: quay.io/keycloak/keycloak:21.1.1
+  # Admin username (password comes from Secret)
   adminUser: admin
+  # Name of the Kubernetes Secret or SealedSecret containing admin password
   adminPasswordSecret: keycloak-secrets
-
-# PostgreSQL configuration
-postgres:
-  image: postgres:15
-  username: keycloak
-  passwordSecret: keycloak-secrets
-  database: keycloakdb
-
-# Storage configuration
-storage:
-  keycloakSize: 5Gi
-  postgresSize: 10Gi
-
-keycloak:
+  # Persistence configuration for Keycloak (optional)
   persistence:
-    enabled: false
+    enabled: true
     size: 5Gi
+  # Resource requests and limits for Keycloak
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
 
+postgres:
+  # PostgreSQL container image
+  image: postgres:15
+  # Database username
+  username: keycloak
+  # Database name
+  database: keycloakdb
+  # Name of the Kubernetes Secret or SealedSecret containing DB password
+  passwordSecret: keycloak-secrets
+  # Persistence configuration for PostgreSQL (mandatory)
+  persistence:
+    size: 10Gi
+  # Resource requests and limits for PostgreSQL
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
