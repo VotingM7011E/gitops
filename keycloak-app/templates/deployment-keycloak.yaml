@@ -24,6 +24,12 @@ spec:
               value: postgres
             - name: KC_DB_URL
               value: "jdbc:postgresql://service-postgres:5432/{{ .Values.postgres.database }}"
+            - name: KC_HOSTNAME
+              value: {{ .Values.domain }}
+            - name: KC_PROXY
+              value: edge
+            - name: KC_HTTP_RELATIVE_PATH
+              value: /
             - name: KC_DB_USERNAME
               value: {{ .Values.postgres.username }}
             - name: KC_DB_PASSWORD
