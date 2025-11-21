@@ -19,17 +19,15 @@ spec:
           image: {{ .Values.keycloak.image }}
           args:
             - start-dev
+            - --http-enabled=true
+            - --http-port=8080
+            - --hostname-strict=false
+            - --proxy=edge
           env:
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL
               value: "jdbc:postgresql://service-postgres:5432/{{ .Values.postgres.database }}"
-            - name: KC_HOSTNAME
-              value: {{ .Values.domain }}
-            - name: KC_PROXY
-              value: edge
-            - name: KC_HTTP_RELATIVE_PATH
-              value: /
             - name: KC_DB_USERNAME
               value: {{ .Values.postgres.username }}
             - name: KC_DB_PASSWORD
@@ -47,6 +45,7 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+              protocol: TCP
           resources:
             requests:
               cpu: {{ .Values.keycloak.resources.requests.cpu }}
