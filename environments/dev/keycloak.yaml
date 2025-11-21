@@ -28,3 +28,9 @@ postgres:
 storage:
   keycloakSize: 5Gi
   postgresSize: 10Gi
+
+keycloak:
+  persistence:
+    enabled: false
+    size: 5Gi
+

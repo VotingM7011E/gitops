@@ -1,23 +1,33 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ .Values.app.name }}
-  namespace: {{ .Values.app.name }}
+  name: keycloak
+  labels:
+    app: keycloak
 spec:
-  serviceName: {{ .Values.app.name }}
+  serviceName: keycloak
   replicas: {{ .Values.app.replicas }}
   selector:
     matchLabels:
-      app: {{ .Values.app.name }}
+      app: keycloak
   template:
     metadata:
       labels:
-        app: {{ .Values.app.name }}
+        app: keycloak
     spec:
       containers:
         - name: keycloak
           image: {{ .Values.keycloak.image }}
+          # Production startup command for Keycloak Quarkus distribution
+          args:
+            - start
+            - --optimized
+            - --http-enabled=true
+            - --http-port=8080
+            - --hostname-strict=false
+            - --proxy=edge
           env:
+            # Admin credentials from Kubernetes Secret
             - name: KEYCLOAK_ADMIN
               value: {{ .Values.keycloak.adminUser }}
             - name: KEYCLOAK_ADMIN_PASSWORD
@@ -25,16 +35,49 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.keycloak.adminPasswordSecret }}
                   key: keycloak-admin-password
+            # Database configuration from Secret
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://postgres:5432/{{ .Values.postgres.database }}
+            - name: KC_DB_USERNAME
+              value: {{ .Values.postgres.username }}
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.passwordSecret }}
+                  key: postgres-password
           ports:
             - containerPort: 8080
+          # Health probes for production readiness
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            # Resource requests and limits for production
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
           volumeMounts:
+            {{- if .Values.keycloak.persistence.enabled }}
             - name: keycloak-data
               mountPath: /opt/keycloak/data
-  volumeClaimTemplates:
-    - metadata:
-        name: keycloak-data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: {{ .Values.storage.keycloakSize }}
+            {{- end }}
+      volumes:
+        {{- if .Values.keycloak.persistence.enabled }}
+        - name: keycloak-data
+          persistentVolumeClaim:
+            claimName: keycloak-pvc
+        {{- end }}

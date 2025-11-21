@@ -1,12 +1,12 @@
+# Ingress with TLS via cert-manager
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: keycloak-ingress
-  namespace: keycloak
   annotations:
     cert-manager.io/cluster-issuer: {{ .Values.ingress.certIssuer }}
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
+  ingressClassName: traefik
   tls:
     - hosts:
         - {{ .Values.domain }}
