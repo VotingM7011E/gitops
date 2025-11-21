@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres
-  namespace: keycloak
+  name: service-postgres
+  namespace: {{ .Values.namespace }}
 spec:
   ports:
     - port: 5432

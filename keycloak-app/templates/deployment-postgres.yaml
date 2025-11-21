@@ -2,10 +2,9 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgres
-  labels:
-    app: postgres
+  namespace: {{ .Values.namespace }}
 spec:
-  serviceName: postgres
+  serviceName: service-postgres
   replicas: 1
   selector:
     matchLabels:
@@ -19,6 +18,8 @@ spec:
         - name: postgres
           image: {{ .Values.postgres.image }}
           env:
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.database }}
             - name: POSTGRES_USER
               value: {{ .Values.postgres.username }}
             - name: POSTGRES_PASSWORD
@@ -26,17 +27,8 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.postgres.passwordSecret }}
                   key: postgres-password
-            - name: POSTGRES_DB
-              value: {{ .Values.postgres.database }}
           ports:
             - containerPort: 5432
-          resources:
-            requests:
-              cpu: "250m"
-              memory: "512Mi"
-            limits:
-              cpu: "500m"
-              memory: "1Gi"
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
@@ -44,7 +36,8 @@ spec:
     - metadata:
         name: postgres-data
       spec:
-        accessModes: ["ReadWriteOnce"]
+        accessModes:
+          - ReadWriteOnce
         resources:
           requests:
             storage: {{ .Values.postgres.persistence.size }}

@@ -2,10 +2,9 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: keycloak
-  labels:
-    app: keycloak
+  namespace: {{ .Values.namespace }}
 spec:
-  serviceName: keycloak
+  serviceName: service-keycloak
   replicas: {{ .Values.app.replicas }}
   selector:
     matchLabels:
@@ -36,7 +35,7 @@ spec:
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL
-              value: jdbc:postgresql://postgres:5432/{{ .Values.postgres.database }}
+              value: "jdbc:postgresql://service-postgres:5432/{{ .Values.postgres.database }}"
             - name: KC_DB_USERNAME
               value: {{ .Values.postgres.username }}
             - name: KC_DB_PASSWORD
@@ -44,6 +43,8 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.postgres.passwordSecret }}
                   key: postgres-password
+            - name: QUARKUS_TRANSACTION_MANAGER_ENABLE_RECOVERY
+              value: "true"
           ports:
             - containerPort: 8080
           livenessProbe:
@@ -58,25 +59,15 @@ spec:
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 10
-          resources:
-            requests:
-              cpu: "500m"
-              memory: "1Gi"
-            limits:
-              cpu: "1"
-              memory: "2Gi"
           volumeMounts:
-            {{- if .Values.keycloak.persistence.enabled }}
             - name: keycloak-data
               mountPath: /opt/keycloak/data
-            {{- end }}
-  {{- if .Values.keycloak.persistence.enabled }}
   volumeClaimTemplates:
     - metadata:
         name: keycloak-data
       spec:
-        accessModes: ["ReadWriteOnce"]
+        accessModes:
+          - ReadWriteOnce
         resources:
           requests:
             storage: {{ .Values.keycloak.persistence.size }}
-  {{- end }}
