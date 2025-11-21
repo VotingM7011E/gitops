@@ -1,0 +1,6 @@
+apiVersion: v2
+name: keycloak-app
+description: A Helm chart for Keycloak with PostgreSQL and secure secrets
+type: application
+version: 0.1.0
+appVersion: "21.1.1"

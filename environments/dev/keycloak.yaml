@@ -1,0 +1,30 @@
+# Keycloak + PostgreSQL secure configuration
+app:
+  name: keycloak
+  replicas: 1
+
+# Domain and email for TLS certificates
+domain: keycloak-dev.ltu-m7011e-2.se
+email: jacsjs-7@student.ltu.se
+
+# Cert issuer (use staging for dev)
+ingress:
+  certIssuer: letsencrypt-staging
+
+# Keycloak configuration
+keycloak:
+  image: quay.io/keycloak/keycloak:21.1.1
+  adminUser: admin
+  adminPasswordSecret: keycloak-secrets
+
+# PostgreSQL configuration
+postgres:
+  image: postgres:15
+  username: keycloak
+  passwordSecret: keycloak-secrets
+  database: keycloakdb
+
+# Storage configuration
+storage:
+  keycloakSize: 5Gi
+  postgresSize: 10Gi
