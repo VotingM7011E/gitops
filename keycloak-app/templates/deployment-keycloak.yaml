@@ -37,7 +37,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.keycloak.adminPasswordSecret }}
-                  key: admin-password
+                  key: keycloak-admin-password
           ports:
             - name: http
               containerPort: 8080
