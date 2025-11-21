@@ -2,13 +2,13 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: keycloak
-  namespace: keycloak
+  namespace: {{ .Values.namespace }}
 spec:
-  serviceName: service-keycloak
-  replicas: 1
+  replicas: {{ .Values.app.replicas }}
   selector:
     matchLabels:
       app: keycloak
+  serviceName: keycloak
   template:
     metadata:
       labels:
@@ -18,20 +18,8 @@ spec:
         - name: keycloak
           image: {{ .Values.keycloak.image }}
           args:
-            - start
-            - --optimized
-            - --db=postgres
-            - --db-url=jdbc:postgresql://service-postgres:5432/keycloakdb
-            - --db-username=keycloak
-            - --db-password=$(KC_DB_PASSWORD)
+            - start-dev
           env:
-            - name: KEYCLOAK_ADMIN
-              value: {{ .Values.keycloak.adminUser }}
-            - name: KEYCLOAK_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.keycloak.adminPasswordSecret }}
-                  key: keycloak-admin-password
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL
@@ -43,19 +31,39 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.postgres.passwordSecret }}
                   key: postgres-password
-            - name: QUARKUS_TRANSACTION_MANAGER_ENABLE_RECOVERY
-              value: "true"
+            - name: KEYCLOAK_ADMIN
+              value: {{ .Values.keycloak.adminUser }}
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.adminPasswordSecret }}
+                  key: admin-password
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
+          resources:
+            requests:
+              cpu: {{ .Values.keycloak.resources.requests.cpu }}
+              memory: {{ .Values.keycloak.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.keycloak.resources.limits.cpu }}
+              memory: {{ .Values.keycloak.resources.limits.memory }}
           volumeMounts:
             - name: keycloak-data
               mountPath: /opt/keycloak/data
-  volumeClaimTemplates:
-    - metadata:
-        name: keycloak-data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 5Gi
+      volumes:
+        - name: keycloak-data
+          persistentVolumeClaim:
+            claimName: keycloak-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: keycloak-pvc
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.keycloak.persistence.size }}
