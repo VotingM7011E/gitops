@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"  # Ensures Keycloak Helm chart applies after secrets
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/VotingM7011E/gitops.git
+    path: keycloak-app
+    targetRevision: main
+    helm:
+      valueFiles:
+        - ../environments/dev/keycloak.yaml
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: keycloak
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
