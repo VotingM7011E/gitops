@@ -59,6 +59,13 @@ spec:
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 10
+          resources:
+            requests:
+              cpu: {{ .Values.keycloak.resources.requests.cpu }}
+              memory: {{ .Values.keycloak.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.keycloak.resources.limits.cpu }}
+              memory: {{ .Values.keycloak.resources.limits.memory }}
           volumeMounts:
             - name: keycloak-data
               mountPath: /opt/keycloak/data
