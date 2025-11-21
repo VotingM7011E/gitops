@@ -2,10 +2,10 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: keycloak
-  namespace: {{ .Values.namespace }}
+  namespace: keycloak
 spec:
   serviceName: service-keycloak
-  replicas: {{ .Values.app.replicas }}
+  replicas: 1
   selector:
     matchLabels:
       app: keycloak
@@ -20,10 +20,10 @@ spec:
           args:
             - start
             - --optimized
-            - --http-enabled=true
-            - --http-port=8080
-            - --hostname-strict=false
-            - --proxy=edge
+            - --db=postgres
+            - --db-url=jdbc:postgresql://service-postgres:5432/keycloakdb
+            - --db-username=keycloak
+            - --db-password=$(KC_DB_PASSWORD)
           env:
             - name: KEYCLOAK_ADMIN
               value: {{ .Values.keycloak.adminUser }}
@@ -47,25 +47,6 @@ spec:
               value: "true"
           ports:
             - containerPort: 8080
-          livenessProbe:
-            httpGet:
-              path: /health/live
-              port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /health/ready
-              port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          resources:
-            requests:
-              cpu: {{ .Values.keycloak.resources.requests.cpu }}
-              memory: {{ .Values.keycloak.resources.requests.memory }}
-            limits:
-              cpu: {{ .Values.keycloak.resources.limits.cpu }}
-              memory: {{ .Values.keycloak.resources.limits.memory }}
           volumeMounts:
             - name: keycloak-data
               mountPath: /opt/keycloak/data
@@ -77,4 +58,4 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: {{ .Values.keycloak.persistence.size }}
+            storage: 5Gi
