@@ -28,9 +28,9 @@ spec:
               value: "admin"
             - name: KEYCLOAK_ADMIN_PASSWORD
               valueFrom:
-                secretKeyRef: # unsure if this actually works / maybe the /manifests/sealed-keycloak-secrets.yaml needs to be copied to this app?
+                secretKeyRef:
                   name: keycloak-admin-password
-                  key: KEYCLOAK_ADMIN_PASSWORD
+                  key: keycloak-admin-password
           ports:
             - containerPort: 80
               name: http
