@@ -20,6 +20,10 @@ spec:
           env:
             - name: MONGO_URI
               value: "mongodb://{{ .Values.mongodb.username }}:{{ .Values.mongodb.password }}@{{ .Values.mongodb.serviceName }}:{{ .Values.mongodb.port }}/{{ .Values.mongodb.database }}?authSource=admin"
+            - name: KEYCLOAK_ISSUER
+              value: "{{ .Values.keycloak.issuer }}"
+            - name: KEYCLOAK_AUDIENCE
+              value: "{{ .Values.app.name }}"
           ports:
             - containerPort: 80
               name: http
