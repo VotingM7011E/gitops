@@ -27,4 +27,4 @@ mongodb:
   serviceName: mongodb
   port: 27017
 keycloak:
-  issuer: https://keycloak-dev.ltu-m7011e-2.se/auth/realms/master
+  issuer: https://keycloak-dev.ltu-m7011e-2.se/realms/master
