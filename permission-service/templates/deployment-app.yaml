@@ -22,6 +22,15 @@ spec:
               value: "{{ .Values.keycloak.issuer }}"
             - name: KEYCLOAK_AUDIENCE
               value: "account"
+            - name: KEYCLOAK_URL
+              value: "{{ .Values.keycloak.url }}"
+            - name: KEYCLOAK_ADMIN_USERNAME
+              value: "admin"
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: # unsure if this actually works / maybe the /manifests/sealed-keycloak-secrets.yaml needs to be copied to this app?
+                  name: keycloak-admin-password
+                  key: KEYCLOAK_ADMIN_PASSWORD
           ports:
             - containerPort: 80
               name: http

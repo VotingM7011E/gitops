@@ -18,4 +18,5 @@ ingress:
   # Use staging for testing to avoid rate limits
   certIssuer: letsencrypt-staging
 keycloak:
+  url: https://keycloak-dev.ltu-m7011e-2.se/
   issuer: https://keycloak-dev.ltu-m7011e-2.se/realms/master
