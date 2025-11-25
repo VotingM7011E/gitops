@@ -22,6 +22,8 @@ spec:
               value: "{{ .Values.keycloak.issuer }}"
             - name: KEYCLOAK_AUDIENCE
               value: "account"
+            - name: KEYCLOAK_REALM
+              value: "master"
             - name: KEYCLOAK_URL
               value: "{{ .Values.keycloak.url }}"
             - name: KEYCLOAK_ADMIN_USERNAME
