@@ -1,0 +1,19 @@
+# Development Environment Configuration
+
+app:
+  name: frontend
+  replicas: 1
+# Development domain - change to your assigned domain
+domain: frontend.ltu-m7011e-2.se
+# Email for Let's Encrypt certificates
+email: anonys-2@student.ltu.se
+# Environment identifier
+environment: Development
+# Container image
+image:
+  repository: ghcr.io/votingm7011e/frontend
+  tag: todo
+# Ingress configuration
+ingress:
+  # Use staging for testing to avoid rate limits
+  certIssuer: letsencrypt-staging
