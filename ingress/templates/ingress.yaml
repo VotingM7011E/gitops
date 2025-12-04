@@ -16,19 +16,20 @@ spec:
     - host: {{ .Values.domain }}
       http:
         paths:
-          - path: /(.*)
+          - path: /
             pathType: Prefix
             backend:
               service:
                 name: frontend
+                namespace: frontend
                 port:
                   number: 80
-
-          - path: /keycloak(/|$)(.*)
+          - path: /keycloak
             pathType: Prefix
             backend:
               service:
                 name: service-keycloak
+                namespace: keycloak
                 port:
                   number: 8080
 
