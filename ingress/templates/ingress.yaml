@@ -6,7 +6,6 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: {{ .Values.ingress.certIssuer }}
     traefik.ingress.kubernetes.io/service.serversscheme: http
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
 spec:
@@ -17,7 +16,7 @@ spec:
     domains:
       - main: {{ .Values.domain }}
   routes:
-    - match: Host(`{{ .Values.domain }}`) && PathPrefix(`/`)
+    - match: Host(`{{ .Values.domain }}`)
       kind: Rule
       services:
         - name: frontend
