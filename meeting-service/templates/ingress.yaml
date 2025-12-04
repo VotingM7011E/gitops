@@ -1,25 +1,23 @@
-apiVersion: argoproj.io/v1alpha1
-kind: Application
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: nginx-ingress
+  name: {{ .Values.app.name }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.certIssuer }}
 spec:
-  project: default
-  source:
-    repoURL: https://kubernetes.github.io/ingress-nginx
-    chart: ingress-nginx
-    targetRevision: 4.11.2
-    helm:
-      values: |
-        controller:
-          replicaCount: 1
+  ingressClassName: traefik
+  rules:
+  - host: {{ .Values.domain }}
+    http:
+      paths:
+      - path: /api/{{ .Values.app.name }}
+        pathType: Prefix
+        backend:
           service:
-            type: LoadBalancer
-  destination:
-    namespace: ingress-nginx
-    server: https://kubernetes.default.svc
-  syncPolicy:
-    automated:
-      selfHeal: true
-      prune: true
-    syncOptions:
-      - CreateNamespace=true
+            name: {{ .Values.app.name }}
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - {{ .Values.domain }}
+    secretName: {{ .Values.app.name }}-tls
