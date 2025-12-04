@@ -11,7 +11,7 @@ metadata:
     traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
 spec:
   entryPoints:
-    - web
+    - websecure
   tls:
     certResolver: {{ .Values.ingress.certIssuer }}
     domains:
