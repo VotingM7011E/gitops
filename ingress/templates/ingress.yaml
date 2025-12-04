@@ -1,5 +1,5 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
 metadata:
   name: {{ .Values.app.name }}
   namespace: {{ .Values.namespace }}
@@ -9,28 +9,18 @@ metadata:
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
 spec:
-  ingressClassName: traefik
+  entryPoints:
+    - web
   tls:
     - hosts:
         - {{ .Values.domain }}
       secretName: {{ .Values.app.name }}-tls
-  rules:
-    - host: {{ .Values.domain }}
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: frontend
-                port:
-                  number: 80
-          - path: /keycloak
-            pathType: Prefix
-            backend:
-              service:
-                name: service-keycloak
-                port:
-                  number: 8080
+  routes:
+    - match: Host(`{{ .Values.domain }}`) && PathPrefix(`/`)
+      kind: Rule
+      services:
+        - name: frontend
+          namespace: frontend
+          port: 80
 
 
