@@ -5,9 +5,6 @@ metadata:
   namespace: {{ .Values.namespace }}
   annotations:
     cert-manager.io/cluster-issuer: {{ .Values.ingress.certIssuer }}
-    traefik.ingress.kubernetes.io/service.serversscheme: http
-    traefik.ingress.kubernetes.io/router.tls: "true"
-    traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
 spec:
   entryPoints:
     - websecure
