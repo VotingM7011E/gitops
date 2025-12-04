@@ -13,9 +13,9 @@ spec:
   entryPoints:
     - web
   tls:
-    - hosts:
-        - {{ .Values.domain }}
-      secretName: {{ .Values.app.name }}-tls
+    certResolver: {{ .Values.ingress.certIssuer }}
+    domains:
+    - main: {{ .Values.domain }}
   routes:
     - match: Host(`{{ .Values.domain }}`) && PathPrefix(`/`)
       kind: Rule
