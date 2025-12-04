@@ -1,8 +1,0 @@
-app:
-  name: ingress
-  replicas: 1
-domain: voting-dev.ltu-m7011e-2.se
-email: anonys-2@student.ltu.se
-environment: Development
-ingress:
-  certIssuer: letsencrypt-prod
