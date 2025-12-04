@@ -15,7 +15,7 @@ spec:
   tls:
     certResolver: {{ .Values.ingress.certIssuer }}
     domains:
-    - main: {{ .Values.domain }}
+      - main: {{ .Values.domain }}
   routes:
     - match: Host(`{{ .Values.domain }}`) && PathPrefix(`/`)
       kind: Rule
