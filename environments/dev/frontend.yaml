@@ -16,4 +16,4 @@ image:
 # Ingress configuration
 ingress:
   # Use staging for testing to avoid rate limits
-  certIssuer: letsencrypt-staging
+  certIssuer: letsencrypt-staginghttps://voting-dev"
