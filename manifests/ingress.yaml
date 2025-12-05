@@ -2,6 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: nginx-ingress
+  namespace: argocd
 spec:
   project: default
   source:
@@ -15,7 +16,7 @@ spec:
           service:
             type: LoadBalancer
   destination:
-    namespace: ingress-nginx
+    namespace: nginx-ingress
     server: https://kubernetes.default.svc
   syncPolicy:
     automated:
