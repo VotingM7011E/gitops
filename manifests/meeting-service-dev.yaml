@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: meeting-service-dev
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/VotingM7011E/gitops.git
+    targetRevision: main
+    path: meeting-service
+    helm:
+      valueFiles:
+        - ../environments/dev/meeting-service.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: meeting-service-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
