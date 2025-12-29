@@ -6,9 +6,6 @@ metadata:
     cert-manager.io/cluster-issuer: {{ .Values.ingress.certIssuer }}
     traefik.ingress.kubernetes.io/router.priority: "10"
     traefik.ingress.kubernetes.io/router.middlewares: "{{ .Release.Namespace }}-{{ .Values.app.name }}-strip-prefix@kubernetescrd"
-
-    traefik.ingress.kubernetes.io/websocket: "true"
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
 spec:
   ingressClassName: traefik
   rules:
