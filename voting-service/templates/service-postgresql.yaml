@@ -8,7 +8,7 @@ spec:
   type: ClusterIP
   ports:
     - port: {{ .Values.postgresql.port }}
-      targetPort: {{ .Values.mongpostgresqlodb.port }}
+      targetPort: {{ .Values.postgresql.port }}
       name: postgresql
   selector:
     app: {{ .Values.postgresql.serviceName }}
