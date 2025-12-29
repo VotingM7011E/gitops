@@ -26,6 +26,6 @@ postgresql:
   # Kubernetes service name for Mongo
   serviceName: postgresql
   port: 5432
-  size: 1Gi
+  size: 1GiB
 keycloak:
   issuer: https://keycloak-dev.ltu-m7011e-2.se/realms/master

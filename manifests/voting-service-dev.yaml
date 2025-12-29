@@ -14,7 +14,7 @@ spec:
         - ../environments/dev/voting-service.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: voiting-service-dev
+    namespace: voting-service-dev
   syncPolicy:
     automated:
       prune: true
