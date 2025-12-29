@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.app.name }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.certIssuer }}
+    traefik.ingress.kubernetes.io/router.priority: "10"
+    traefik.ingress.kubernetes.io/router.middlewares: "{{ .Release.Namespace }}-{{ .Values.app.name }}-strip-prefix@kubernetescrd"
+
+    traefik.ingress.kubernetes.io/websocket: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: {{ .Values.domain }}
+    http:
+      paths:
+        - path: /api/{{ .Values.app.name }}
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ .Values.app.name }}
+              port:
+                number: 80
+  tls:
+  - hosts:
+    - {{ .Values.domain }}
+    secretName: {{ .Values.app.name }}-tls
