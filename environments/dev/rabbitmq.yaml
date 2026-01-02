@@ -5,6 +5,13 @@ app:
 environment: Development
 
 rabbitmq:
+  # Keep the standard Bitnami image repository
+  image:
+    registry: docker.io
+    repository: bitnami/rabbitmq
+    tag: latest
+    pullPolicy: IfNotPresent
+
   auth:
     username: user
     password: userpass123
@@ -15,8 +22,4 @@ rabbitmq:
 
   metrics:
     enabled: true
-  image:
-    registry: docker.io
-    repository: bitnamilegacy/rabbitmq
-
 
