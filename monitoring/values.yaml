@@ -1,0 +1,2 @@
+# default values (can be mostly empty)
+kube-prometheus-stack: {}

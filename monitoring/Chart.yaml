@@ -1,0 +1,10 @@
+apiVersion: v2
+name: monitoring
+version: 0.1.0
+type: application
+
+dependenciesdependencies:
+  - name: kube-prometheus-stack
+    version: 80.9.2
+
+

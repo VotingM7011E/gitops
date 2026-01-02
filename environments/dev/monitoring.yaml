@@ -1,0 +1,17 @@
+# Development Environment Configuration
+
+app:
+  name: monitoring
+environment: Development
+
+kube-prometheus-stack:
+  grafana:
+    adminPassword: admin123
+
+  prometheus:
+    prometheusSpec:
+      # Make Prometheus discover ServiceMonitors across namespaces (good for student projects)
+      serviceMonitorSelector: {}
+      serviceMonitorNamespaceSelector: {}
+      podMonitorSelector: {}
+

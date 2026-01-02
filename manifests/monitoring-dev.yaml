@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-dev
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring-dev
+  source:
+    repoURL: https://github.com/VotingM7011E/gitops.git
+    targetRevision: main
+    path: monitoring
+    helm:
+      releaseName: monitoring-dev
+      valueFiles:
+        - ../environments/dev/monitoring.yaml
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
