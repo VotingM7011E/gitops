@@ -1,5 +1,4 @@
 # Development Environment Configuration
-
 app:
   name: monitoring
 environment: Development
@@ -10,8 +9,7 @@ kube-prometheus-stack:
 
   prometheus:
     prometheusSpec:
-      # Make Prometheus discover ServiceMonitors across namespaces (good for student projects)
+      # Important: discover      # Important: discover ServiceMonitors/PodMonitors across namespaces
       serviceMonitorSelector: {}
       serviceMonitorNamespaceSelector: {}
       podMonitorSelector: {}
-
