@@ -1,69 +1,82 @@
-# RabbitMQ Integration (Fast Track) — MeetingService ↔ ElectionService
+# VotingService + RabbitMQ (Fast Track)
 
-> **Purpose:** Get reliable inter-service messaging working **quickly** with minimal code and minimal new infrastructure.
-> 
-> **Scope:** This guide focuses on **application integration** (publish/consume) and **verification**. It assumes RabbitMQ + monitoring are already deployed in the cluster.
-
----
-
-## 1) Quick mental model (what you need to know)
-
-RabbitMQ uses the AMQP model: producers publish to an **exchange**, which routes messages to **queues** (consumers read from queues). You generally **publish to an exchange**, not directly to a queue. [^rmq-tut]  
-Connection settings are conveniently represented as a single AMQP URI: `amqp://user:pass@host:port/vhost`. [^rmq-uri]
+> **Audience:** Team members integrating RabbitMQ quickly into the existing VotingService Flask code (`app.py`).
+>
+> **Goal:** Move *poll creation* from “HTTP-only” to also support *RabbitMQ-triggered* creation, with minimal refactor and minimal time.
 
 ---
 
-## 2) Integration strategy (painless + consistent)
+## 0) Why RabbitMQ here?
 
-### Recommended minimal pattern
-- Use **one shared exchange**: `events` (type: `topic`) [^rmq-tut]
-- Each service owns **one durable queue** (e.g., `election-service`) and binds routing keys it cares about (e.g., `agenda.election.*`). [^rmq-tut]
-- MeetingService **publishes** events when state changes.
-- ElectionService **consumes** events and performs its business logic.
+RabbitMQ lets services communicate asynchronously: producers **publish** events, consumers **consume** them later (decoupling services). RabbitMQ’s AMQP model is *publish → exchange → route → queue → consume*. [^rmq-tut]  
+Connection details are commonly carried as a single URI string: `amqp://user:pass@host:port/vhost` (standardized by RabbitMQ). [^rmq-uri]
 
-### Why this works well under time pressure
-- No synchronous coupling between services.
-- Easy to extend with more events/services later.
-- Simple to debug in RabbitMQ UI and Prometheus/Grafana.
+In our architecture, **VotingService** should create polls when another service (e.g., ElectionService) requests one. In the current code, this is already noted:
+
+> `# POST /polls/ - Create a new poll`  
+> `# Should be moved to consume RabbitMQ messages.`  
+
+(See `create_poll()` in `app.py`.)
 
 ---
 
-## 3) Required configuration (env vars only)
+## 1) What exists today (in `app.py`)
 
-### Kubernetes DNS for RabbitMQ
-In Kubernetes, Services are resolvable with the name format:
+Your VotingService already has a complete “create poll” implementation:
+- Validates request JSON (`meeting_id`, `pollType`, `options`)
+- Writes `Poll` + `PollOption` rows via SQLAlchemy
+- Returns `poll.uuid` and option list
 
-`<service>.<namespace>.svc.cluster.local` [^k8s-dns]
+Today it’s triggered via HTTP:
+- `POST /polls/` (creates poll)
 
-So RabbitMQ is reachable at:
-- `rabbitmq.rabbitmq-dev.svc.cluster.local:5672`
+### The minimal change we want
+Keep the same logic, but make it callable from:
+1) HTTP (existing behavior)
+2) RabbitMQ consumer handler (new behavior)
 
-### Standardize to one variable (best)
-Set this in both services:
+---
+
+## 2) Required environment variables (no new images)
+
+### Use a single connection variable: `AMQP_URL`
+RabbitMQ recommends passing connection parameters as a single AMQP URI. [^rmq-uri]
+
+In Kubernetes, your RabbitMQ Service DNS will be:
+
+`rabbitmq.rabbitmq-dev.svc.cluster.local` (Kubernetes service DNS format) [^k8s-dns]
+
+So you typically set:
 
 ```bash
 AMQP_URL=amqp://USER:PASSWORD@rabbitmq.rabbitmq-dev.svc.cluster.local:5672/
 MQ_EXCHANGE=events
-SERVICE_NAME=meeting-service   # or election-service
+SERVICE_NAME=voting-service
+MQ_QUEUE=voting-service
+MQ_BINDINGS=voting.create
 ```
 
-The URI format is standardized by RabbitMQ so you don’t need separate host/port/user/pass variables unless you prefer them. [^rmq-uri]
+- `MQ_EXCHANGE`: shared topic exchange name
+- `MQ_QUEUE`: durable queue name owned by this service
+- `MQ_BINDINGS`: routing keys this service consumes (comma-separated)
 
 ---
 
-## 4) Add the smallest possible RabbitMQ helper (shared module)
+## 3) Add RabbitMQ dependency
 
-> **Python services:** We use `pika` (RabbitMQ’s common Python AMQP client; also used in official tutorials). [^rmq-tut]
-
-### Step 4.1 Add dependency
-Add to each service requirements:
+Add to your requirements (where you keep Flask deps) e.g. `requirements.txt`:
 
 ```txt
 pika==1.3.2
 ```
 
-### Step 4.2 Create `mq.py` (same file in both repos)
-Create `app/src/mq.py` (or equivalent) with:
+RabbitMQ’s tutorials use Pika in Python examples and the AMQP publish/consume model. [^rmq-tut]
+
+---
+
+## 4) Add a tiny RabbitMQ helper module (`mq.py`)
+
+Create a file next to your Flask code, for example `mq.py` in the same folder as `app.py`.
 
 ```python
 import os, json, uuid
@@ -71,16 +84,14 @@ from datetime import datetime, timezone
 import pika
 
 EXCHANGE = os.getenv("MQ_EXCHANGE", "events")
-EXCHANGE_TYPE = os.getenv("MQ_EXCHANGE_TYPE", "topic")  # topic recommended
+EXCHANGE_TYPE = os.getenv("MQ_EXCHANGE_TYPE", "topic")
 
 def _conn():
     return pika.BlockingConnection(pika.URLParameters(os.environ["AMQP_URL"]))
 
 def publish_event(routing_key: str, data: dict, *, event_version: int = 1):
-    """Publish one JSON event to the exchange."""
     connection = _conn()
     ch = connection.channel()
-
     ch.exchange_declare(exchange=EXCHANGE, exchange_type=EXCHANGE_TYPE, durable=True)
 
     event = {
@@ -98,13 +109,12 @@ def publish_event(routing_key: str, data: dict, *, event_version: int = 1):
         body=json.dumps(event).encode("utf-8"),
         properties=pika.BasicProperties(
             content_type="application/json",
-            delivery_mode=2,  # persistent
+            delivery_mode=2,
         ),
     )
     connection.close()
 
 def start_consumer(*, queue: str, bindings: list[str], on_event):
-    """Start a background consumer thread; calls on_event(event_dict)."""
     import threading
 
     def _run():
@@ -123,7 +133,6 @@ def start_consumer(*, queue: str, bindings: list[str], on_event):
                 on_event(event)
                 ch_.basic_ack(delivery_tag=method.delivery_tag)
             except Exception:
-                # keep it simple for the course: requeue on error
                 ch_.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
         ch.basic_consume(queue=queue, on_message_callback=callback, auto_ack=False)
@@ -134,140 +143,178 @@ def start_consumer(*, queue: str, bindings: list[str], on_event):
     return t
 ```
 
-**Notes:**
-- Uses an exchange + routing keys (topic pattern), matching RabbitMQ’s recommended messaging model. [^rmq-tut]
-- Uses a single AMQP URL string, matching the RabbitMQ URI spec. [^rmq-uri]
+This matches RabbitMQ’s “publish to exchange + routing key” model and uses the standardized AMQP URI. [^rmq-tut] [^rmq-uri]
 
 ---
 
-## 5) MeetingService: publish events (2 calls)
+## 5) Minimal refactor in `app.py` (make poll creation reusable)
 
-### Event names (minimum viable)
-- `agenda.election.create`
-- `agenda.election.start`
+### Step 5.1 Extract “create poll” logic into a pure function
+Right now `create_poll()` reads from `request.get_json()` and returns Flask responses. That’s hard to reuse from a message consumer.
 
-### Where to publish
-In the code path where MeetingService:
-1) moves to an election agenda item → publish `agenda.election.create`
-2) starts the election voting → publish `agenda.election.start`
-
-Example (Flask route or service function):
+Add a helper **inside** `app.py`:
 
 ```python
-from mq import publish_event
+def create_poll_from_vote_data(vote_data: dict):
+    # Validate required fields
+    meeting_id = vote_data.get("meeting_id")
+    poll_type = vote_data.get("pollType")
+    options = vote_data.get("options", [])
 
-publish_event("agenda.election.create", {
-    "meeting_id": meeting_id,
-    "agenda_item_id": agenda_item_id,
-    "title": title,
-})
+    if not meeting_id:
+        raise ValueError("Missing 'meeting_id'")
+    if poll_type not in ["single", "ranked"]:
+        raise ValueError("Invalid 'pollType'. Must be 'single' or 'ranked'")
+    if not options or len(options) < 2:
+        raise ValueError("At least 2 options are required")
 
-publish_event("agenda.election.start", {
-    "meeting_id": meeting_id,
-    "agenda_item_id": agenda_item_id,
-})
+    poll = Poll(meeting_id=meeting_id, poll_type=poll_type)
+    db.session.add(poll)
+    db.session.flush()  # get poll.id
+
+    for index, option_value in enumerate(options):
+        db.session.add(PollOption(
+            poll_id=poll.id,
+            option_value=option_value,
+            option_order=index,
+        ))
+
+    db.session.commit()
+
+    return {
+        "uuid": str(poll.uuid),
+        "meeting_id": poll.meeting_id,
+        "pollType": poll.poll_type,
+        "options": options,
+    }
 ```
 
----
-
-## 6) ElectionService: consume events (one consumer thread)
-
-ElectionService should own a durable queue, e.g. `election-service`, and bind it to election routing keys.
-
-### Step 6.1 Add handler
-In `app/src/app.py` (or your Flask startup module):
+### Step 5.2 Make the HTTP endpoint call the helper
+Replace the body of `create_poll()` with:
 
 ```python
-import os
-from flask import Flask
+@blueprint.route("/polls/", methods=["POST"])
+def create_poll():
+    data = request.get_json()
+    if not data or "vote" not in data:
+        return jsonify({"error": "Missing 'vote' in request body"}), 400
+
+    try:
+        result = create_poll_from_vote_data(data["vote"])
+        return jsonify(result), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+```
+
+Now you can call the same logic from RabbitMQ.
+
+---
+
+## 6) Add the RabbitMQ consumer to VotingService (fastest: background thread)
+
+> **Course-speed approach:** start a background consumer thread when Flask starts.
+> In production you might run consumers as separate workers, but this is quickest for 6-day timelines.
+
+Add near app startup (after `db.init_app(app)`), for example:
+
+```python
 from mq import start_consumer
 
-app = Flask(__name__)
-
-def handle_event(event: dict):
+def on_event(event: dict):
+    # event envelope: {event_type, data, ...}
     et = event.get("event_type")
     data = event.get("data", {})
 
-    if et == "agenda.election.create":
-        # TODO: create election item + open nominations
-        print("[ElectionService] create election", data)
+    if et == "voting.create":
+        # IMPORTANT: we need app context for db.session
+        with app.app_context():
+            # expected payload: {"vote": {...}} OR just vote_data
+            vote_data = data.get("vote") or data
+            create_poll_from_vote_data(vote_data)
 
-    elif et == "agenda.election.start":
-        # TODO: close nominations + start voting
-        print("[ElectionService] start election", data)
-
-    else:
-        print("[ElectionService] ignoring", et)
-
+# Start consumer thread (after app exists)
 start_consumer(
-    queue=os.getenv("MQ_QUEUE", "election-service"),
-    bindings=os.getenv("MQ_BINDINGS", "agenda.election.*").split(","),
-    on_event=handle_event,
+    queue=os.getenv("MQ_QUEUE", "voting-service"),
+    bindings=os.getenv("MQ_BINDINGS", "voting.create").split(","),
+    on_event=on_event,
 )
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}, 200
 ```
 
-### Step 6.2 Add env vars
+### Message format expected
+For compatibility with your current HTTP request schema (`{"vote": {...}}`), send events like:
 
-```bash
-MQ_QUEUE=election-service
-MQ_BINDINGS=agenda.election.*
+```json
+{
+  "event_type": "voting.create",
+  "data": {
+    "vote": {
+      "meeting_id": "...",
+      "pollType": "single",
+      "options": ["Alice", "Bob"]
+    }
+  }
+}
 ```
-
-Binding with wildcards is a standard topic-exchange pattern. [^rmq-tut]
 
 ---
 
-## 7) Local test loop (no new containers)
+## 7) How ElectionService (or MeetingService) should request a vote
 
-### Option A — Use cluster RabbitMQ via port-forward
+When ElectionService is ready to create a ballot, it publishes:
+
+- Exchange: `events`
+- Routing key: `voting.create`
+- Data: your existing poll schema
+
+Any service can publish using the same AMQP URL and exchange model. RabbitMQ tutorials cover this publish pattern. [^rmq-tut]
+
+---
+
+## 8) Local smoke test (no Kubernetes changes)
+
+### Step 1 — port-forward RabbitMQ AMQP
 
 ```bash
 kubectl -n rabbitmq-dev port-forward svc/rabbitmq 5672:5672
 ```
 
-Then:
+### Step 2 — run VotingService locally
 
 ```bash
 export AMQP_URL='amqp://USER:PASSWORD@localhost:5672/'
 export MQ_EXCHANGE='events'
-export SERVICE_NAME='election-service'
-export MQ_QUEUE='election-service'
-export MQ_BINDINGS='agenda.election.*'
+export MQ_QUEUE='voting-service'
+export MQ_BINDINGS='voting.create'
 
-flask --app app/src/app.py run
+python app.py
 ```
 
-Run MeetingService locally and hit the endpoint that publishes the event.
-
-### Option B — Observe via RabbitMQ Management UI
-Port-forward:
+### Step 3 — publish a test message (quick python one-liner)
 
 ```bash
-kubectl -n rabbitmq-dev port-forward svc/rabbitmq 15672:15672
+python - <<'PY'
+import os, json, pika
+os.environ['AMQP_URL']=os.environ.get('AMQP_URL')
+conn=pika.BlockingConnection(pika.URLParameters(os.environ['AMQP_URL']))
+ch=conn.channel()
+ch.exchange_declare(exchange='events', exchange_type='topic', durable=True)
+msg={"event_type":"voting.create","data":{"vote":{"meeting_id":"m1","pollType":"single","options":["A","B"]}}}
+ch.basic_publish(exchange='events', routing_key='voting.create', body=json.dumps(msg).encode())
+print('published')
+conn.close()
+PY
 ```
 
-Open http://localhost:15672 and watch:
-- queues
-- message rates
-- consumers
-
-The management UI is part of RabbitMQ’s management image tags and is useful for debugging. [^rmq-docker]
+Then verify in DB (or via `GET /polls/<uuid>/` if available).
 
 ---
 
-## 8) Verify with Monitoring (Prometheus + Grafana)
+## 9) Verify with monitoring (optional but recommended)
 
-RabbitMQ exposes metrics via the Prometheus plugin at `/metrics`. [^rmq-prom]
+RabbitMQ exposes `/metrics` using the Prometheus plugin and is meant to be monitored with Prometheus + Grafana. [^rmq-prom]
 
-### Prometheus (truth source)
-- Prometheus UI → **Status → Targets** shows the RabbitMQ ServiceMonitor target **UP**.
-
-### Grafana (visualize)
-In Grafana Explore (Prometheus datasource):
+- Prometheus UI → **Status → Targets** should show RabbitMQ target **UP**.
+- Grafana Explore:
 
 ```promql
 up{job="rabbitmq"}
@@ -279,34 +326,22 @@ And a proof-of-life metric:
 rabbitmq_build_info
 ```
 
-Grafana datasource configuration should point to the Prometheus service URL, not `localhost`, because `localhost` inside containers refers to Grafana itself. [^grafana-prom]
+Grafana datasource should point at Prometheus service URL (not localhost in container deployments). [^grafana-prom]
 
 ---
 
-## 9) Common gotchas (save hours)
+## 10) Common gotchas
 
-1) **React should not connect directly to RabbitMQ.** Browsers don’t speak AMQP 0‑9‑1 by default; keep AMQP in backend services.
-2) **Use one queue per service** (consumer group). Don’t create one queue per producer.
-3) **Ack messages** only after successful handling.
-4) If messages are not delivered: verify exchange name, routing key, and queue bindings.
-
----
-
-## 10) Minimal roadmap (aligned with team plan)
-
-- MeetingService → `meeting.created` → PermissionService grants manager
-- MeetingService → `agenda.election.create` → ElectionService sets up nominations
-- MeetingService → `agenda.election.start` → ElectionService starts voting
-- ElectionService → `voting.create` → VotingService creates ballot
-- VotingService → `voting.completed` → ElectionService finalizes results
+- **Don’t connect React directly to RabbitMQ** (AMQP is backend-to-backend)
+- **Ack only after DB commit** (avoid losing messages)
+- Consider **idempotency** (messages can be retried → avoid duplicate polls)
 
 ---
 
 ## References
 
-[^rmq-uri]: RabbitMQ AMQP URI specification (`amqp://user:pass@host:port/vhost`). https://www.rabbitmq.com/docs/uri-spec
-[^rmq-tut]: RabbitMQ tutorials explain publish/subscribe model (publish to exchanges, bind queues). https://www.rabbitmq.com/tutorials/tutorial-three-python
-[^rmq-prom]: RabbitMQ Prometheus monitoring guide (`rabbitmq_prometheus` plugin, `/metrics`). https://www.rabbitmq.com/docs/prometheus
-[^grafana-prom]: Grafana Prometheus datasource config (note on container `localhost`). https://grafana.com/docs/grafana/latest/datasources/prometheus/configure/
-[^k8s-dns]: Kubernetes DNS for Services and Pods (service DNS format & namespace behavior). https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
-[^rmq-docker]: RabbitMQ Docker official image (management UI, tags, ports). https://hub.docker.com/_/rabbitmq
+[^rmq-uri]: RabbitMQ URI specification (`amqp://user:pass@host:port/vhost`). https://www.rabbitmq.com/docs/uri-spec
+[^rmq-tut]: RabbitMQ tutorials explain exchange→queue→consumer model (Python). https://www.rabbitmq.com/tutorials/tutorial-three-python
+[^k8s-dns]: Kubernetes DNS for Services and Pods (service DNS format). https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
+[^rmq-prom]: RabbitMQ monitoring with Prometheus (`/metrics`). https://www.rabbitmq.com/docs/prometheus
+[^grafana-prom]: Grafana Prometheus datasource configuration (localhost pitfall). https://grafana.com/docs/grafana/latest/datasources/prometheus/configure/
