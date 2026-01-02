@@ -4,6 +4,7 @@ metadata:
   name: rabbitmq
   labels:
     app: rabbitmq
+    release: monitoring-dev
 spec:
   selector:
     matchLabels:
