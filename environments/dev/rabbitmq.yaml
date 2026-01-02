@@ -1,18 +1,13 @@
-
 # Development Environment Configuration
 app:
   name: rabbitmq
 environment: Development
 
-rabbitmq:
-  auth:
-    username: user
-    password: userpass123
+image:
+  repository: rabbitmq
+  tag: 4-management
+  pullPolicy: IfNotPresent
 
-  persistence:
-    enabled: true
-    size: 1Gi
-
-  metrics:
-    enabled: true
-
+auth:
+  username: user
+  password: userpass123

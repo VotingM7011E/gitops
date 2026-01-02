@@ -3,7 +3,3 @@ name: rabbitmq
 version: 0.1.0
 type: application
 
-dependencies:
-  - name: rabbitmq
-    version: 16.0.6
-    repository: https://charts.bitnami.com/bitnami
