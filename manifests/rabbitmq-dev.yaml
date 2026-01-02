@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   destination:
-       server: https://kubernetes.default.svc
+    server: https://kubernetes.default.svc
     namespace: rabbitmq-dev
   source:
     repoURL: https://github.com/VotingM7011E/gitops.git
