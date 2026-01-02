@@ -15,4 +15,8 @@ rabbitmq:
 
   metrics:
     enabled: true
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/rabbitmq
+
 
