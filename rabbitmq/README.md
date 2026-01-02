@@ -1,306 +1,312 @@
-# Monitoring + RabbitMQ (Dev) — GitOps (Argo CD + Helm)
+# RabbitMQ Integration (Fast Track) — MeetingService ↔ ElectionService
 
-> **Audience:** Team members onboarding to our dev cluster setup.
->
-> **Goal:** Understand **what we deployed**, **why**, **how to verify it works**, and **how to onboard more services** (metrics + async messaging).
-
----
-
-## TL;DR (What we built)
-
-We deployed two platform components using **Argo CD + Helm**:
-
-1. **Monitoring stack** (**`monitoring-dev`** namespace)
-   - **Prometheus** (collects/stores metrics)
-   - **Grafana** (visualizes metrics)
-   - **Prometheus Operator** (auto-discovers scrape targets via `ServiceMonitor`)
-
-2. **RabbitMQ** (**`rabbitmq-dev`** namespace)
-   - Message broker for **asynchronous service-to-service communication** (publish/consume)
-   - Exposes Prometheus metrics on **`/metrics`** (via `rabbitmq_prometheus` plugin)
-
-This gives us:
-- **Observability**: cluster + app metrics in Prometheus/Grafana
-- **Loose coupling**: services communicate through RabbitMQ events
-
-**Key docs:** kube‑prometheus‑stack uses Prometheus Operator + Grafana; Prometheus Operator discovers targets via `ServiceMonitor` CRDs; Argo CD supports Helm apps with `valueFiles` and sync options. [^kps] [^argocd-helm] [^argocd-sync]
+> **Purpose:** Get reliable inter-service messaging working **quickly** with minimal code and minimal new infrastructure.
+> 
+> **Scope:** This guide focuses on **application integration** (publish/consume) and **verification**. It assumes RabbitMQ + monitoring are already deployed in the cluster.
 
 ---
 
-## Repo convention (how it’s organized)
+## 1) Quick mental model (what you need to know)
 
-We follow our GitOps structure:
-
-- `manifests/` → Argo CD `Application` YAMLs (and optional raw Kubernetes manifests)
-- `environments/dev/*.yaml` → dev-specific values per app
-- `<chart>/` → Helm charts stored in Git (e.g., `monitoring/`, `rabbitmq/`)
-
-Argo CD renders Helm charts from Git and applies them to the cluster; values can be provided via `valueFiles`. [^argocd-helm]
+RabbitMQ uses the AMQP model: producers publish to an **exchange**, which routes messages to **queues** (consumers read from queues). You generally **publish to an exchange**, not directly to a queue. [^rmq-tut]  
+Connection settings are conveniently represented as a single AMQP URI: `amqp://user:pass@host:port/vhost`. [^rmq-uri]
 
 ---
 
-## Part 1 — Monitoring stack (`monitoring-dev`)
+## 2) Integration strategy (painless + consistent)
 
-### What is Prometheus?
-Prometheus is a **metrics collector** and **time-series database**. It periodically **scrapes** metric endpoints and stores the results for querying with PromQL. [^kps]
+### Recommended minimal pattern
+- Use **one shared exchange**: `events` (type: `topic`) [^rmq-tut]
+- Each service owns **one durable queue** (e.g., `election-service`) and binds routing keys it cares about (e.g., `agenda.election.*`). [^rmq-tut]
+- MeetingService **publishes** events when state changes.
+- ElectionService **consumes** events and performs its business logic.
 
-### What is Grafana?
-Grafana is the **visualization UI**. It queries Prometheus and renders dashboards/graphs. Grafana has built‑in support for a Prometheus data source (you configure its Prometheus URL). [^grafana-prom]
-
-### What is Prometheus Operator?
-Prometheus Operator is a Kubernetes operator that manages Prometheus instances and config. It **discovers scrape targets** primarily through `ServiceMonitor`/`PodMonitor` resources (CRDs). [^kps]
-
-### Why did we enable Argo CD Server-Side Apply?
-Large CRDs (common in monitoring stacks) can hit the Kubernetes annotation size limit with client-side apply. Argo CD supports `ServerSideApply=true`, which avoids “annotations too long” failures. [^argocd-sync]
-
----
-
-## Part 2 — RabbitMQ (`rabbitmq-dev`)
-
-RabbitMQ provides asynchronous communication:
-- Producers publish messages/events
-- Consumers process them later
-
-### Ports we expose (service `rabbitmq`)
-- **5672/TCP**: AMQP (apps connect here)
-- **15672/TCP**: Management UI
-- **15692/TCP**: Prometheus metrics endpoint (HTTP) at **`/metrics`**
-
-RabbitMQ’s built-in Prometheus support comes from the `rabbitmq_prometheus` plugin and exposes metrics in Prometheus format. [^rabbitmq-prom]
+### Why this works well under time pressure
+- No synchronous coupling between services.
+- Easy to extend with more events/services later.
+- Simple to debug in RabbitMQ UI and Prometheus/Grafana.
 
 ---
 
-## How to verify everything works (the “checklist”)
+## 3) Required configuration (env vars only)
 
-### 1) Pods running
+### Kubernetes DNS for RabbitMQ
+In Kubernetes, Services are resolvable with the name format:
+
+`<service>.<namespace>.svc.cluster.local` [^k8s-dns]
+
+So RabbitMQ is reachable at:
+- `rabbitmq.rabbitmq-dev.svc.cluster.local:5672`
+
+### Standardize to one variable (best)
+Set this in both services:
 
 ```bash
-kubectl get pods -n monitoring-dev
-kubectl get pods -n rabbitmq-dev
+AMQP_URL=amqp://USER:PASSWORD@rabbitmq.rabbitmq-dev.svc.cluster.local:5672/
+MQ_EXCHANGE=events
+SERVICE_NAME=meeting-service   # or election-service
 ```
 
-Expected:
-- `monitoring-dev`: Prometheus, Grafana, operator, node-exporter, kube-state-metrics, etc.
-- `rabbitmq-dev`: RabbitMQ pod Running
+The URI format is standardized by RabbitMQ so you don’t need separate host/port/user/pass variables unless you prefer them. [^rmq-uri]
 
-### 2) Prometheus is scraping RabbitMQ (source of truth)
+---
 
-Port-forward Prometheus UI:
+## 4) Add the smallest possible RabbitMQ helper (shared module)
+
+> **Python services:** We use `pika` (RabbitMQ’s common Python AMQP client; also used in official tutorials). [^rmq-tut]
+
+### Step 4.1 Add dependency
+Add to each service requirements:
+
+```txt
+pika==1.3.2
+```
+
+### Step 4.2 Create `mq.py` (same file in both repos)
+Create `app/src/mq.py` (or equivalent) with:
+
+```python
+import os, json, uuid
+from datetime import datetime, timezone
+import pika
+
+EXCHANGE = os.getenv("MQ_EXCHANGE", "events")
+EXCHANGE_TYPE = os.getenv("MQ_EXCHANGE_TYPE", "topic")  # topic recommended
+
+def _conn():
+    return pika.BlockingConnection(pika.URLParameters(os.environ["AMQP_URL"]))
+
+def publish_event(routing_key: str, data: dict, *, event_version: int = 1):
+    """Publish one JSON event to the exchange."""
+    connection = _conn()
+    ch = connection.channel()
+
+    ch.exchange_declare(exchange=EXCHANGE, exchange_type=EXCHANGE_TYPE, durable=True)
+
+    event = {
+        "event_type": routing_key,
+        "event_version": event_version,
+        "event_id": str(uuid.uuid4()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "producer": os.getenv("SERVICE_NAME", "unknown-service"),
+        "data": data,
+    }
+
+    ch.basic_publish(
+        exchange=EXCHANGE,
+        routing_key=routing_key,
+        body=json.dumps(event).encode("utf-8"),
+        properties=pika.BasicProperties(
+            content_type="application/json",
+            delivery_mode=2,  # persistent
+        ),
+    )
+    connection.close()
+
+def start_consumer(*, queue: str, bindings: list[str], on_event):
+    """Start a background consumer thread; calls on_event(event_dict)."""
+    import threading
+
+    def _run():
+        connection = _conn()
+        ch = connection.channel()
+
+        ch.exchange_declare(exchange=EXCHANGE, exchange_type=EXCHANGE_TYPE, durable=True)
+        ch.queue_declare(queue=queue, durable=True)
+
+        for rk in bindings:
+            ch.queue_bind(queue=queue, exchange=EXCHANGE, routing_key=rk)
+
+        def callback(ch_, method, properties, body):
+            try:
+                event = json.loads(body.decode("utf-8"))
+                on_event(event)
+                ch_.basic_ack(delivery_tag=method.delivery_tag)
+            except Exception:
+                # keep it simple for the course: requeue on error
+                ch_.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+
+        ch.basic_consume(queue=queue, on_message_callback=callback, auto_ack=False)
+        ch.start_consuming()
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    return t
+```
+
+**Notes:**
+- Uses an exchange + routing keys (topic pattern), matching RabbitMQ’s recommended messaging model. [^rmq-tut]
+- Uses a single AMQP URL string, matching the RabbitMQ URI spec. [^rmq-uri]
+
+---
+
+## 5) MeetingService: publish events (2 calls)
+
+### Event names (minimum viable)
+- `agenda.election.create`
+- `agenda.election.start`
+
+### Where to publish
+In the code path where MeetingService:
+1) moves to an election agenda item → publish `agenda.election.create`
+2) starts the election voting → publish `agenda.election.start`
+
+Example (Flask route or service function):
+
+```python
+from mq import publish_event
+
+publish_event("agenda.election.create", {
+    "meeting_id": meeting_id,
+    "agenda_item_id": agenda_item_id,
+    "title": title,
+})
+
+publish_event("agenda.election.start", {
+    "meeting_id": meeting_id,
+    "agenda_item_id": agenda_item_id,
+})
+```
+
+---
+
+## 6) ElectionService: consume events (one consumer thread)
+
+ElectionService should own a durable queue, e.g. `election-service`, and bind it to election routing keys.
+
+### Step 6.1 Add handler
+In `app/src/app.py` (or your Flask startup module):
+
+```python
+import os
+from flask import Flask
+from mq import start_consumer
+
+app = Flask(__name__)
+
+def handle_event(event: dict):
+    et = event.get("event_type")
+    data = event.get("data", {})
+
+    if et == "agenda.election.create":
+        # TODO: create election item + open nominations
+        print("[ElectionService] create election", data)
+
+    elif et == "agenda.election.start":
+        # TODO: close nominations + start voting
+        print("[ElectionService] start election", data)
+
+    else:
+        print("[ElectionService] ignoring", et)
+
+start_consumer(
+    queue=os.getenv("MQ_QUEUE", "election-service"),
+    bindings=os.getenv("MQ_BINDINGS", "agenda.election.*").split(","),
+    on_event=handle_event,
+)
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}, 200
+```
+
+### Step 6.2 Add env vars
 
 ```bash
-kubectl -n monitoring-dev port-forward svc/monitoring-dev-kube-promet-prometheus 9090:9090
+MQ_QUEUE=election-service
+MQ_BINDINGS=agenda.election.*
 ```
 
-Open: http://localhost:9090 → **Status → Targets**
+Binding with wildcards is a standard topic-exchange pattern. [^rmq-tut]
 
-Expected:
-- You see a target like `serviceMonitor/rabbitmq-dev/rabbitmq/0` and it is **UP**.
+---
 
-Why this works: Prometheus Operator generates scrape config from `ServiceMonitor`. [^kps]
+## 7) Local test loop (no new containers)
 
-### 3) Grafana can query Prometheus
-
-Port-forward Grafana:
+### Option A — Use cluster RabbitMQ via port-forward
 
 ```bash
-kubectl -n monitoring-dev port-forward svc/monitoring-dev-grafana 3000:80
+kubectl -n rabbitmq-dev port-forward svc/rabbitmq 5672:5672
 ```
 
-Open: http://localhost:3000
+Then:
 
-In Grafana:
-- **Explore → Data source: Prometheus**
-- Run:
+```bash
+export AMQP_URL='amqp://USER:PASSWORD@localhost:5672/'
+export MQ_EXCHANGE='events'
+export SERVICE_NAME='election-service'
+export MQ_QUEUE='election-service'
+export MQ_BINDINGS='agenda.election.*'
+
+flask --app app/src/app.py run
+```
+
+Run MeetingService locally and hit the endpoint that publishes the event.
+
+### Option B — Observe via RabbitMQ Management UI
+Port-forward:
+
+```bash
+kubectl -n rabbitmq-dev port-forward svc/rabbitmq 15672:15672
+```
+
+Open http://localhost:15672 and watch:
+- queues
+- message rates
+- consumers
+
+The management UI is part of RabbitMQ’s management image tags and is useful for debugging. [^rmq-docker]
+
+---
+
+## 8) Verify with Monitoring (Prometheus + Grafana)
+
+RabbitMQ exposes metrics via the Prometheus plugin at `/metrics`. [^rmq-prom]
+
+### Prometheus (truth source)
+- Prometheus UI → **Status → Targets** shows the RabbitMQ ServiceMonitor target **UP**.
+
+### Grafana (visualize)
+In Grafana Explore (Prometheus datasource):
 
 ```promql
-up
+up{job="rabbitmq"}
 ```
 
-You should see many targets with value `1`.
-
-**Important:** In Grafana’s Prometheus datasource config, do **not** use `localhost:9090` (that would point to Grafana itself). Use the in-cluster service URL:
-
-```
-http://monitoring-dev-kube-promet-prometheus:9090
-```
-
-Grafana’s own docs explain this “localhost in containers” pitfall. [^grafana-prom]
-
-### 4) RabbitMQ metrics exist
-
-In Grafana Explore, run:
+And a proof-of-life metric:
 
 ```promql
 rabbitmq_build_info
 ```
 
-If you see a result series, you’re reading real RabbitMQ metrics.
-
-You can also hit the endpoint directly:
-
-```bash
-kubectl -n rabbitmq-dev port-forward svc/rabbitmq 15692:15692
-curl -s http://localhost:15692/metrics | head
-```
-
-RabbitMQ documents this Prometheus endpoint behavior. [^rabbitmq-prom]
+Grafana datasource configuration should point to the Prometheus service URL, not `localhost`, because `localhost` inside containers refers to Grafana itself. [^grafana-prom]
 
 ---
 
-## How monitoring discovery works (and the “release label” gotcha)
+## 9) Common gotchas (save hours)
 
-### How Prometheus decides what to scrape
-In Operator-based setups, Prometheus does **not** scrape random services automatically. It scrapes what is described by `ServiceMonitor`/`PodMonitor` resources **that match Prometheus selectors**. [^kps]
-
-### Our key gotcha: `release: monitoring-dev`
-Our Prometheus instance was selecting only ServiceMonitors labeled with:
-
-```yaml
-release: monitoring-dev
-```
-
-So RabbitMQ’s `ServiceMonitor` had to include:
-
-```yaml
-metadata:
-  labels:
-    release: monitoring-dev
-```
-
-Once added, RabbitMQ appeared as an **UP** target.
+1) **React should not connect directly to RabbitMQ.** Browsers don’t speak AMQP 0‑9‑1 by default; keep AMQP in backend services.
+2) **Use one queue per service** (consumer group). Don’t create one queue per producer.
+3) **Ack messages** only after successful handling.
+4) If messages are not delivered: verify exchange name, routing key, and queue bindings.
 
 ---
 
-## Pattern to monitor ANY service (copy/paste guide)
+## 10) Minimal roadmap (aligned with team plan)
 
-To monitor another service (MeetingService, ElectionService, Todo, etc.), you need 3 things:
-
-### Step A — Expose metrics from the service
-Your app must expose metrics (commonly `/metrics`).
-
-### Step B — Expose a Kubernetes Service port named `metrics`
-Example service port snippet:
-
-```yaml
-ports:
-  - name: metrics
-    port: 9091
-    targetPort: 9091
-```
-
-### Step C — Create a ServiceMonitor
-Template example (place in the service Helm chart under `templates/servicemonitor.yaml`):
-
-```yaml
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: {{ .Release.Name }}
-  labels:
-    release: monitoring-dev
-spec:
-  selector:
-    matchLabels:
-      app: {{ .Release.Name }}
-  namespaceSelector:
-    matchNames:
-      - {{ .Release.Namespace }}
-  endpoints:
-    - port: metrics
-      path: /metrics
-      interval: 30s
-```
-
-Then verify:
-- Prometheus Targets shows it as **UP**
-- Grafana query `up{job="<jobname>"}` returns `1`
-
----
-
-## Using RabbitMQ for inter-service communication (practical next step)
-
-RabbitMQ gives you async messaging:
-
-- **MeetingService publishes** event `meeting.created`
-- **ElectionService consumes** and reacts
-
-### Cluster DNS name
-From any namespace:
-
-```
-rabbitmq.rabbitmq-dev.svc.cluster.local
-```
-
-### Connection values to put in service dev values
-
-```yaml
-rabbitmq:
-  host: rabbitmq.rabbitmq-dev.svc.cluster.local
-  port: 5672
-  username: <user>
-  password: <pass>
-  exchange: events
-  routingKeyMeetingCreated: meeting.created
-```
-
-### Inject env vars in Helm Deployment
-
-```yaml
-env:
-  - name: RABBITMQ_HOST
-    value: {{ .Values.rabbitmq.host | quote }}
-  - name: RABBITMQ_PORT
-    value: {{ .Values.rabbitmq.port | quote }}
-  - name: RABBITMQ_USER
-    value: {{ .Values.rabbitmq.username | quote }}
-  - name: RABBITMQ_PASS
-    value: {{ .Values.rabbitmq.password | quote }}
-  - name: RABBITMQ_EXCHANGE
-    value: {{ .Values.rabbitmq.exchange | quote }}
-  - name: RABBITMQ_ROUTINGKEY_MEETING_CREATED
-    value: {{ .Values.rabbitmq.routingKeyMeetingCreated | quote }}
-```
-
-Once services publish/consume messages, your Grafana RabbitMQ dashboard becomes “alive” with throughput/queue behavior.
-
----
-
-## Security note (recommended): Sealed Secrets for credentials
-
-Kubernetes Secrets are **base64-encoded** and stored **unencrypted by default** unless encryption-at-rest is configured. [^k8s-secrets]
-
-For GitOps, prefer **Sealed Secrets**:
-- Store encrypted secrets in Git
-- Controller decrypts inside the cluster
-
-Argo CD explicitly recommends “destination cluster secret management” approaches like Sealed Secrets (rather than injecting secrets at render time). [^argocd-secrets]  
-Sealed Secrets workflow (create Secret → `kubeseal` → commit SealedSecret) is documented by the project. [^sealed-secrets]
-
----
-
-## Troubleshooting (quick fixes)
-
-### RabbitMQ not appearing in Prometheus Targets
-1. Confirm `ServiceMonitor` exists in `rabbitmq-dev`
-2. Confirm it has `release: monitoring-dev`
-3. Confirm RabbitMQ service has `port: metrics` and path `/metrics`
-4. Check Prometheus UI → **Status → Targets** for why it’s missing
-
-### Grafana Explore shows no “Prometheus” datasource
-- Ensure Grafana datasource is configured to:
-  - `http://monitoring-dev-kube-promet-prometheus:9090`
-- Do not use `localhost:9090` in containers. [^grafana-prom]
+- MeetingService → `meeting.created` → PermissionService grants manager
+- MeetingService → `agenda.election.create` → ElectionService sets up nominations
+- MeetingService → `agenda.election.start` → ElectionService starts voting
+- ElectionService → `voting.create` → VotingService creates ballot
+- VotingService → `voting.completed` → ElectionService finalizes results
 
 ---
 
 ## References
 
-[^argocd-helm]: Argo CD Helm support (Applications, valueFiles): https://argo-cd.readthedocs.io/en/stable/user-guide/helm/
-[^argocd-sync]: Argo CD sync options (incl. ServerSideApply): https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/
-[^kps]: kube-prometheus-stack overview (Prometheus Operator stack): https://unstructured-io.github.io/prometheus-community-helm-charts/
-[^grafana-prom]: Grafana Prometheus datasource configuration (URL and localhost note): https://grafana.com/docs/grafana/latest/datasources/prometheus/configure/
-[^rabbitmq-prom]: RabbitMQ monitoring with Prometheus/Grafana (`rabbitmq_prometheus`, `/metrics`): https://www.rabbitmq.com/docs/prometheus
-[^sealed-secrets]: Sealed Secrets project README (workflow): https://github.com/bitnami-labs/sealed-secrets
-[^argocd-secrets]: Argo CD secret management guidance (recommends Sealed Secrets approach): https://argo-cd.readthedocs.io/en/stable/operator-manual/secret-management/
-[^k8s-secrets]: Kubernetes good practices for Secrets (base64, encryption-at-rest): https://kubernetes.io/docs/concepts/security/secrets-good-practices/
-
+[^rmq-uri]: RabbitMQ AMQP URI specification (`amqp://user:pass@host:port/vhost`). https://www.rabbitmq.com/docs/uri-spec
+[^rmq-tut]: RabbitMQ tutorials explain publish/subscribe model (publish to exchanges, bind queues). https://www.rabbitmq.com/tutorials/tutorial-three-python
+[^rmq-prom]: RabbitMQ Prometheus monitoring guide (`rabbitmq_prometheus` plugin, `/metrics`). https://www.rabbitmq.com/docs/prometheus
+[^grafana-prom]: Grafana Prometheus datasource config (note on container `localhost`). https://grafana.com/docs/grafana/latest/datasources/prometheus/configure/
+[^k8s-dns]: Kubernetes DNS for Services and Pods (service DNS format & namespace behavior). https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
+[^rmq-docker]: RabbitMQ Docker official image (management UI, tags, ports). https://hub.docker.com/_/rabbitmq
