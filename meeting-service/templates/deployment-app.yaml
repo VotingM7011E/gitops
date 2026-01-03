@@ -24,6 +24,8 @@ spec:
               value: "{{ .Values.keycloak.issuer }}"
             - name: KEYCLOAK_AUDIENCE
               value: "account"
+            - name: AMQP_URL
+              value: "amqp://user:userpass123@rabbitmq.rabbitmq-dev.svc.cluster.local:5672/"
           ports:
             - containerPort: 80
               name: http
