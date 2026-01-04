@@ -11,7 +11,7 @@ email: anonys-2@student.ltu.se
 environment: Development
 # Container image
 image:
-  repository: ghcr.io/votingm7011e/meetingservice
+  repository: ghcr.io/votingm7011e/motionservice
   tag: f0c8009aaa8ae74860e89be176b8854fad0082b5
 # Ingress configuration
 ingress:
