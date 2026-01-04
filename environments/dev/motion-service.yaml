@@ -1,0 +1,30 @@
+# Development Environment Configuration
+
+app:
+  name: motion-service
+  replicas: 1
+# Development domain - change to your assigned domain
+domain: voting-dev.ltu-m7011e-2.se
+# Email for Let's Encrypt certificates
+email: anonys-2@student.ltu.se
+# Environment identifier
+environment: Development
+# Container image
+image:
+  repository: ghcr.io/votingm7011e/meetingservice
+  tag: 0880e9f60266964e33e1fe842cbb003d8fbe951c
+# Ingress configuration
+ingress:
+  # Use staging for testing to avoid rate limits
+  certIssuer: letsencrypt-prod
+mongodb:
+  enabled: true
+  image: mongo:6
+  username: tempadmin
+  password: changeme!
+  database: motion-service-db
+  # Kubernetes service name for Mongo
+  serviceName: mongodb
+  port: 27017
+keycloak:
+  issuer: https://keycloak-dev.ltu-m7011e-2.se/realms/master
