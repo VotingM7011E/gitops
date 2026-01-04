@@ -9,10 +9,10 @@ data:
   init.sql: |
     -- Table: positions
     CREATE TABLE IF NOT EXISTS positions (
-        position_id     SERIAL PRIMARY KEY,
-        meeting_id      INT NOT NULL,
-        position_name   VARCHAR(255) NOT NULL,
-        is_open         BOOLEAN NOT NULL DEFAULT TRUE
+      position_id     SERIAL PRIMARY KEY,
+      meeting_id      UUID NOT NULL,
+      position_name   VARCHAR(255) NOT NULL,
+      is_open         BOOLEAN NOT NULL DEFAULT TRUE
     );
 
     -- Table: nominations
