@@ -38,7 +38,44 @@ spec:
           volumeMounts:
             - name: postgresql-storage
               mountPath: /var/lib/postgresql/data
+            - name: postgresql-initdb-sql
+              mountPath: /docker-entrypoint-initdb.d
       volumes:
         - name: postgresql-storage
           persistentVolumeClaim:
             claimName: postgresql-pvc
+        - name: postgresql-initdb-sql
+          configMap:
+            name: postgresql-initdb-sql
+
+---
+# ConfigMap containing SQL run by postgres image at initialization
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-initdb-sql
+  labels:
+    app: {{ .Values.postgresql.serviceName }}
+data:
+  init.sql: |
+    -- Table: positions
+    CREATE TABLE IF NOT EXISTS positions (
+        position_id     SERIAL PRIMARY KEY,
+        meeting_id      INT NOT NULL,
+        position_name   VARCHAR(255) NOT NULL,
+        is_open         BOOLEAN NOT NULL DEFAULT TRUE
+    );
+
+    -- Table: nominations
+    CREATE TABLE IF NOT EXISTS nominations (
+        position_id     INT NOT NULL,
+        username        VARCHAR(255) NOT NULL,
+        accepted        BOOLEAN NOT NULL DEFAULT FALSE,
+
+        PRIMARY KEY (position_id, username),
+
+        CONSTRAINT fk_nominations_positions
+            FOREIGN KEY (position_id)
+                REFERENCES positions(position_id)
+                ON DELETE CASCADE
+    );
