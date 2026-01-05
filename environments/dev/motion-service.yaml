@@ -12,7 +12,7 @@ environment: Development
 # Container image
 image:
   repository: ghcr.io/votingm7011e/motionservice
-  tag: ed8585e29beee419dfc2d34e7f2cfe6dac05fadf
+  tag: 50955c2be83a65cde6fd03dcb0aa783a1d335108
 # Ingress configuration
 ingress:
   # Use staging for testing to avoid rate limits
